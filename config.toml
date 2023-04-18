@@ -1,4 +1,4 @@
-baseURL = 'https://package-papers.github.io/Packaged-Papers/'
+baseURL = 'https://package-papers.github.io/'
 languageCode = 'en-us'
 title = 'Packaged-Papers'
 theme = 'Hugo-Theme'
