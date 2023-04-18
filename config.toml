@@ -1,4 +1,4 @@
 baseURL = 'https://package-papers.github.io/Blog/'
 languageCode = 'en-us'
-title = 'Blog-Name-TBD'
+title = 'Packaged-Papers'
 theme = 'Hugo-Theme'
