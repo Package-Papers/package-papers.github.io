@@ -51,10 +51,8 @@ jobs:
           
       - name: Set up theme
         run: |
-          cd ./themes/Hugo-Theme
           npm install
-          npm run build
-          cd ../../
+          npm run build:css
           
       - name: Setup Pages
         id: pages
