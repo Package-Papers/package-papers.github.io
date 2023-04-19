@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "predev": "npx tailwindcss -i themes/Hugo-Theme/assets/main.css -o themes/Hugo-Theme/assets/style.css",
     "dev:css": "npx tailwindcss -i themes/Hugo-Theme/assets/main.css -o themes/Hugo-Theme/assets/style.css --watch",
     "dev:hugo": "hugo server --disableFastRender",
     "dev": "run-p dev:*",
