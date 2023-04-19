@@ -1,0 +1,20 @@
+{
+  "name": "package-papers.github.io-make-setup",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev:css": "npx tailwindcss -i themes/Hugo-Theme/assets/main.css -o themes/Hugo-Theme/assets/style.css --watch",
+    "dev:hugo": "hugo server --disableFastRender",
+    "dev": "run-p dev:*",
+    "build:css": "NODE_ENV=production npx tailwindcss -i themes/Hugo-Theme/assets/main.css -o themes/Hugo-Theme/assets/style.css -m",
+    "build:hugo": "hugo",
+    "build": "run-s build:*"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "tailwindcss": "^3.3.1"
+  }
+}
