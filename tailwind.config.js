@@ -4,7 +4,11 @@
  *       be standalone.
  */
 module.exports = {
-  content: ["content/**/*.md", "themes/Hugo-Theme/layouts/**/*.html"],
+  content: [
+    "content/**/*.md", 
+    "themes/Hugo-Theme/layouts/**/*.html",
+    "themes/Hugo-Theme/assets/**/*.js"
+  ],
   darkMode: "class",
   theme: {
     extend: {},
