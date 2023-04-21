@@ -2,3 +2,10 @@ baseURL = 'https://package-papers.github.io/'
 languageCode = 'en-us'
 title = 'Packaged-Papers'
 theme = 'Hugo-Theme'
+
+[[params.sidebar.menu]]
+  name = "CONTENT"
+  header = true
+[[params.sidebar.menu]]
+  name = "Posts"
+  url = "/posts"
