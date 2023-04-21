@@ -49,4 +49,4 @@ q
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,linux,hugo
 node_modules
-themes
+themes/Hugo-Theme
