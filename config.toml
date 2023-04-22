@@ -3,6 +3,11 @@ languageCode = 'en-us'
 title = 'Packaged-Papers'
 theme = 'Hugo-Theme'
 
+[taxonomies]
+  tag = "tags"
+  category = "categories"
+  author = "authors"
+
 [[params.sidebar.menu]]
   name = "CONTENT"
   header = true
