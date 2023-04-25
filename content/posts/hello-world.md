@@ -3,6 +3,8 @@ title: "Hello World"
 authors:
   - 'Ochawin Apichattakul'
 date: 2023-04-21T16:51:20+07:00
+tags:
+- Random
 ---
 
 ## Hello!
