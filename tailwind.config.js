@@ -11,7 +11,19 @@ module.exports = {
   ],
   darkMode: "class",
   theme: {
-    extend: {},
+
+    extend: {
+      fontFamily: {
+        sans: ['Inter'],
+      },
+      boxShadow: {
+        'top-highlight': 'inset 0 1px 0 rgba(256, 256, 256, 0.1)'
+      },
+      spacing: {
+        'nav-bar-icon-padding': '0.3rem'
+
+      },
+    },
   },
   plugins: [
     require('@tailwindcss/typography'),
