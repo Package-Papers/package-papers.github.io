@@ -3,6 +3,9 @@ languageCode = 'en-us'
 title = 'Packaged-Papers'
 theme = 'Hugo-Theme'
 
+pygmentsCodeFences = true
+pygmentsUseClasses = true
+
 [taxonomies]
   tag = "tags"
   category = "categories"
