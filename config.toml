@@ -6,6 +6,11 @@ theme = 'Hugo-Theme'
 pygmentsCodeFences = true
 pygmentsUseClasses = true
 
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+
 [taxonomies]
   tag = "tags"
   category = "categories"
