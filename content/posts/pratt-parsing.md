@@ -6,6 +6,7 @@ authors:
 tags:
   - compiler
   - parsing
+  - python
 math: true
 draft: true
 ---
@@ -67,19 +68,31 @@ Since I'm building everything from complete scratch, I'm going to have to build 
 
 Since this is only for demonstrative purposes I'm going to keep it as simple as possible. 
 
-So first, we can define our tokens as a simple enum:
+Our token will simply contain the token type and its string value (referred to as the lexeme).
 {{< codeblock name= "Defining tokens" >}}
 {{< highlight python >}}
 from enum import Enum
+from dataclasses import dataclass
 
-# This enum represents the tokens for each type of symbol. 
-# There are only three main cases for us.
+# All different token types we have:
 # 1. Number
 # 2. Operator
 # 3. Parenthesis
-Token = Enum(
-    "Token", ["ILLEGAL", "INTEGER", "PLUS", "MINUS", "MULT", "DIV", "LPAREN", "RPAREN"]
+# 4. ILLEGAL & End Of File
+TokenType = Enum(
+    "Token", ["ILLEGAL", "INTEGER", "PLUS",
+              "MINUS", "MULT", "DIV", "LPAREN", "RPAREN", "EOF"]
 )
+
+# A token is just a dataclass holding the
+# type of the token and it's raw string value.
+@dataclass
+class Token:
+    token_type: TokenType
+    lexeme: str
+
+# The End of File token. We have to place this manually.
+EOF_TOKEN = Token(TokenType.EOF, "")
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -90,23 +103,26 @@ def tokenize(input: str) -> Token:
     """
     Given a string, return its relevant token.
     """
+    token_type: TokenType
 
     if input == "+":
-        return Token.PLUS
+        token_type = TokenType.PLUS
     elif input == "-":
-        return Token.MINUS
+        token_type = TokenType.MINUS
     elif input == "/":
-        return Token.DIV
+        token_type = TokenType.DIV
     elif input == "*":
-        return Token.MULT
+        token_type = TokenType.MULT
     elif input == "(":
-        return Token.LPAREN
+        token_type = TokenType.LPAREN
     elif input == ")":
-        return Token.RPAREN
+        token_type = TokenType.RPAREN
     elif input.isnumeric():
-        return Token.INTEGER
+        token_type = TokenType.INTEGER
     else:
-        return Token.ILLEGAL
+        token_type = TokenType.ILLEGAL
+
+    return Token(token_type, input)
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -116,11 +132,11 @@ Now implementing our (crude) lexer becomes trivial.
 {{< highlight python >}}
 def lex(input: str) -> List[Token]:
     """
-    Given an input, split all symbols by
-    space and tokenize each of the symbols.
+    Given an input, split all words by a single
+    space, trim and tokenize each of the words.
+    Note: The EOF token is manually appended.
     """
-
-    return [tokenize(word.strip()) for word in input.split(" ")]
+    return [tokenize(word.strip()) for word in input.split(" ")] + [EOF_TOKEN]
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -133,21 +149,173 @@ So now we can properly tokenize any given expression like this:
 {{< codeblock name= "Tokenizing an expression" >}}
 {{< highlight python >}}
 input = "1 + ( 2 * 3 ) - 4 / 2"
-token_stream = lex(input)
-# [
-#  <Token.INTEGER: 2>,
-#  <Token.PLUS:    3>,
-#  <Token.LPAREN:  7>,
-#  <Token.INTEGER: 2>,
-#  <Token.MULT:    5>,
-#  <Token.INTEGER: 2>,
-#  <Token.RPAREN:  8>,
-#  <Token.MINUS:   4>,
-#  <Token.INTEGER: 2>,
-#  <Token.DIV:     6>,
-#  <Token.INTEGER: 2>
-# ]
-
+token_stream = lex(input) 
+# [Token(token_type=<Token.INTEGER: 2>, lexeme='1'), Token(token_type=<Token.PLUS: 3>, ...
 {{< /highlight>}}
 {{< /codeblock>}}
 
+Superb, everything is almost ready, we just have to set up our parser class now. Here are the methods we need:
+* A method to read the current token
+* A method to increment the position of the current token
+* A method to return the next token
+* A method to check whether our current token matches what we expect
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+class Parser:
+
+    # Lex the input source and store
+    def __init__(self, input: str):
+        self.current = 0
+        self.tokens = lex(input)
+
+    # Returns the current token
+    def read(self) -> Token:
+        return self.tokens[self.current]
+
+    # Returns the current token and increment the position
+    def advance(self) -> Token:
+        token = self.read()
+        self.current += 1
+        return token
+
+    # Returns the next token
+    def peakNext(self) -> Token:
+        return self.tokens[self.current + 1]
+
+    # Returns whether the current token matches the expected token
+    def expect(self, token: Token) -> bool:
+        return self.read() == token 
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Alright great, now our parser is sufficient. Let's get started.
+
+## 4. Prefix expressions
+Alas, we've reached the first boss. Incase you're unfamiliar, a prefix expression is either a **number** [2, 5, 10], or an **unary** expression which is an expression preceded by an operator [-2, -5, -(-10)].  In Pratt parsing, this is the first thing you parse, so let's setup to do exactly that.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+Expression = Any
+
+class Parser:
+    # Code omitted...
+
+    def parseExpression(self) -> Expression:
+        token = self.advance()
+
+        # Parse the prefix expression based on current token.
+        expr = self.parsePrefixExpression(token)
+
+        # We always expect an expression, if there isn't one, parser error.
+        if expr is None:
+            return None
+
+        return expr
+        
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Great, now we can start with parsing the simplest form of an expression: constant expressions (2, 5, 10). We'll need to add another type for that.
+
+{{< codeblock name= "Expression Types" >}}
+{{< highlight python >}}
+Expression = Any
+
+@dataclass 
+class ConstantExpression:
+    expr: int
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Parsing a constant value is trivial, we just have to convert the lexeme into an integer.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parseConstantExpression(self, token: Token) -> ConstantExpression:
+    return ConstantExpression(int(token.lexeme))
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Now we just have to wire it into our **parsePrefixExpression** method.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parsePrefixExpression(self, token: Token) -> Expression:
+    match token.token_type:
+        case TokenType.INTEGER: # Constant Expression
+            return self.parseConstantExpression(token)
+        case _: # Unexpected token found
+            print(f"Error, no matching prefix rule found for: {token}")
+            return None
+{{< /highlight>}}
+{{< /codeblock>}}
+
+And now with just this, we can actually parse numbers! Let's give it a whirl.
+
+{{< codeblock name= "Parsing constant expressions" >}}
+{{< highlight python >}}
+Parser("2").parseExpression()   # ConstantExpression(expr=2)
+Parser("42").parseExpression()  # ConstantExpression(expr=42)
+Parser("900").parseExpression() # ConstantExpression(expr=900)
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Now let's move onto parsing unary expressions. Again, we have to add a new type.
+{{< codeblock name= "Expression Types" >}}
+{{< highlight python >}}
+@dataclass
+class UnaryExpression:
+    operator_token: TokenType
+    expr: Expression
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Notice that the **unary** expression class consists of two members, one holding the prefix operator token (+, -, etc) and the other one holding the expression it applies to. 
+
+Getting the operator token is trivial, we can extract it straight from the current token we're reading. But now here's a thought provoking question, how on Earth will we work out the expression? If only we had a function which could figure it out for us... 
+
+Oh! There is nothing stopping us from calling **parseExpression**! We can just throw the work of figuring out the expression to it. Now parsing unary expression becomes trivial.
+
+{{< codeblock name= "Expression Types" >}}
+{{< highlight python >}}
+def parseUnaryExpression(self, token: Token) -> UnaryExpression:
+    return UnaryExpression(token.token_type, self.parseExpression())
+{{< /highlight>}}
+{{< /codeblock>}}
+Now we wire it back.
+
+<blockquote>Note: We can easily support for more unary operators by just adding more cases.</blockquote>
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parsePrefixExpression(self, token: Token) -> Expression:
+    match token.token_type:
+        # ...
+        case TokenType.MINUS: # Unary Expression
+            return self.parseUnaryExpression(token)
+        # ...
+{{< /highlight>}}
+{{< /codeblock>}}
+
+
+Great, now we can try parsing some unary expressions
+
+{{< codeblock name= "Parsing unary expressions" >}}
+{{< highlight python >}}
+a = Parser("- 2").parseExpression()
+# a = UnaryExpression(
+#       operator_token=<Token.MINUS: 4>,  
+#       expr=ConstantExpression(expr=2)
+# )
+
+b = Parser("- - 42").parseExpression()
+# b = UnaryExpression(
+#       operator_token=<Token.MINUS: 4>, 
+#       expr=UnaryExpression(
+#               operator_token=<Token.MINUS: 4>, 
+#               expr=ConstantExpression(expr=42)
+#       )
+# )
+{{< /highlight>}}
+{{< /codeblock>}}
