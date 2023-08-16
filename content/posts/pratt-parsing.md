@@ -8,6 +8,7 @@ tags:
   - parsing
   - python
 math: true
+draft: true
 ---
 I was first introduced to the concept of `Pratt parsing` (top down operator precedence) while reading [Bob Nystrom](https://journal.stuffwithstuff.com/)'s remarkable [crafting interpreters](https://craftinginterpreters.com/), a book which I think everyone should read atleast once in their career. Pratt parsing, named after its creator [Vaughan Pratt](https://en.wikipedia.org/wiki/Vaughan_Pratt), is a powerful technique used in programming language parsing.
 
@@ -83,8 +84,8 @@ from dataclasses import dataclass
 # 3. Parenthesis
 # 4. Illegal & End Of File
 TokenType = Enum(
-    "Token", ["ILLEGAL", "INTEGER", "PLUS",
-              "MINUS", "MULT", "DIV", "LPAREN", "RPAREN", "EOF"]
+    "Token",
+    ["ILLEGAL", "INTEGER", "PLUS", "MINUS", "MULT", "DIV", "POW", "LPAREN", "RPAREN", "EOF"],
 )
 
 # A token is just a dataclass holding the
@@ -120,6 +121,8 @@ def tokenize(input: str) -> Token:
         token_type = TokenType.LPAREN
     elif input == ")":
         token_type = TokenType.RPAREN
+    elif input == "^":
+        token_type = TokenType.POW
     elif input.isnumeric():
         token_type = TokenType.INTEGER
     else:
@@ -373,10 +376,12 @@ Let's see how our parser fares so far.
 {{< codeblock name= "Evaluating prefix expressions" >}}
 {{< highlight python >}}
 Parser("- 2 + 2").parseExpression()
-# returns UnaryExpression(operator_token=<Token.MINUS: 4>, expr=ConstantExpression(expr=2)){{< /highlight>}}
+# UnaryExpression(operator_token=<Token.MINUS: 4>, expr=ConstantExpression(expr=2)){{< /highlight>}}
 {{< /codeblock>}}
 
-To no surprise, it isn't working properly, but thankfully we can cleary see why. The problem is that we stop parsing after we have finished with the infix expression. Let's fix that.
+To no surprise, it isn't working properly, but thankfully we can cleary see why. The problem is that we stop parsing after we have finished with the infix expression. 
+
+Let's fix that.
 
 Once again, we begin by defining a new expression type.
 
@@ -405,17 +410,21 @@ def parseExpression(self) -> Expression:
 {{< /highlight>}}
 {{< /codeblock>}}
 
-The `parseInfixExpression` method is almost a mirror of the `parsePrefixExpression`, the only difference is that we need to pass in the left hand side expression.
+The `parseInfixExpression` function is almost a mirror of the `parsePrefixExpression`, the only difference is that we need to also pass in the left hand side expression.
 
 {{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
-    def parseInfixExpression(self, token: Token, expr: Expression):
-        match token.token_type:
-            case TokenType.PLUS | TokenType.MINUS | TokenType.DIV | TokenType.MULT:
-                return BinaryExpression(expr, token.token_type, self.parseExpression())
-            case _:
-                print(f"Error, no matching infix rule found for: {token}")
-                return None
+def parseInfixExpression(self, token: Token, expr: Expression):
+    match token.token_type:
+        case: ... # all binary tokens... (+ - ^ * /)
+            return BinaryExpression(
+                expr, 
+                token.token_type, 
+                self.parseExpression(getPrecedence(token.token_type))
+            )
+        case _:
+            print(f"Error, no matching infix rule found for: {token}")
+            return None
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -438,24 +447,26 @@ Oh... that's awkard... It seems like the recursive call to `parseExpression` fro
 
 Thankfully the Pratt parser's arsenal has a weapon that combats exactly this. Let me show you why the Pratt parser is called the `top down operator precedence` parser.
 
-Let's me introduce you to the <ins>**precedence table**</ins>, it should look familiar.
+## 6. Handling Precedence
+
+Allow me to introduce you to the <ins>**precedence table**</ins>, it should look familiar.
 
 {{< codeblock name= "Precedence Table" >}}
 {{< highlight python >}}
-# Low -> High
-# This is BIDMAS in reverse, with the addition of PREFIX.
+# Precedence: Low -> High
+# This is BIDMAS, with the addition of PREFIX.
 class Precedence(IntEnum):
     NONE           = 0
-    START          = 1
+    START          = 1 # This is the level of precedence we start parsing from.
     SUBTRACTION    = 2
     ADDITION       = 3
     MULTIPLICATION = 4
     DIVISION       = 5
-    INDICES        = 6
-    PREFIX         = 7
+    PREFIX         = 6
+    INDICES        = 7
     BRACKET        = 8
 
-// Create a mapping between tokens and their precedence
+# Create a mapping between tokens and their precedence
 def getPrecedence(token: TokenType) -> Precedence:
     match token:
         case TokenType.PLUS:
@@ -468,8 +479,98 @@ def getPrecedence(token: TokenType) -> Precedence:
             return Precedence.DIVISION
         case TokenType.LPAREN:
             return Precedence.BRACKET
-        case TokenType.EOF:
+        case TokenType.POW:
+            return Precedence.INDICES
+        case _:
             return Precedence.NONE
-    return Precedence.NONE
 {{< /highlight>}}
 {{< /codeblock>}}
+
+Notice that we don't have a case which returns `Precedence.PREFIX` here. This will pop up later!
+
+Now we refactor the `parseExpression` function to pass in the precedence as a parameter. We will also use it to determine whether we parse the infix or not.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parseExpression(self, precedence: Precedence) -> Expression:
+    # Parse prefix expression...
+
+    # We will parse the infix IF the precedence of the 
+    # operator is higher or equal to the current context's precedence.
+    if precedence <= getPrecedence(self.read().token_type):
+        token = self.advance()
+        expr = self.parseInfixExpression(token, expr)
+
+    return expr
+{{< /highlight>}}
+{{< /codeblock>}}
+
+While we're at it, lets also create a new function which begins the parsing process.
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+
+# We parse starting from the lowest valid precedence possible. 
+# This means that it will only stop once we reach EOF, since Precendence.NONE is lower.
+def parse(self) -> Expression:
+    return self.parseExpression(Precedence.START)
+{{< /highlight>}}
+{{< /codeblock>}}
+
+And now this is where the `Precedence.PREFIX` shows up:
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parseUnaryExpression(self, token: Token) -> UnaryExpression:
+    return UnaryExpression(
+        token.token_type, 
+        self.parseExpression(Precedence.PREFIX) # <-- We parse with the precedence of prefix.
+    )
+{{< /highlight>}}
+{{< /codeblock>}}
+
+We also have to refactor `parseInfixExpression`.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parseInfixExpression(self, token: Token, expr: Expression):
+    match token.token_type:
+        case ...: # all binary operators (+, -, *, /, ^)
+            return BinaryExpression(
+                expr,
+                token.token_type,
+                self.parseExpression(getPrecedence(token.token_type)),
+            )
+        case _:
+            # Unexpected token error...
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Now we can try to parse again.
+
+{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< highlight python >}}
+Parser("- 2 + 2").parse()
+# BinaryExpression(
+#     lhs=UnaryExpression(
+#         operator_token=<Token.MINUS: 4>, 
+#         expr=ConstantExpression(expr=2)     ====>    (-2) + (2)
+#     ), 
+#     operator_token=<Token.PLUS: 3>, 
+#     rhs=ConstantExpression(expr=2)
+# )
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Great! It seems like it's working. 
+
+I'm sure that was quite alot to take in, so let's break it down.
+
+The best way to really under stand how this works is by following what exactly happens. The following is the step-by-step of what occurs:
+
+1. `parse` is called, starting a new `parseExpression` process (**p1**) on `-2 + 2` with the precedence of **START**.
+2. `parsePrefixExpression` is called by **p1**, it parses for an <ins>unary expression</ins>, so it captures the `-` operator and calls `parseExpression` (**p2**) on `2 + 2` with the precedence of **PREFIX**.
+3. `parsePrefixExpreesion` is called by **p2**, it parses for a <ins>constant expression</ins>, so it only captures the first `2`.
+4. **p2** is terminated. No infix is parsed because the precedence of `+` (**ADDITION**) is lower than **PREFIX**. Control is returned to **p1**.
+5. The precedence of `+` (**ADDITION**) is higher than **START**. `parseInfixExpression` is called by **p1**. It parses for a binary expression, so it captures the `+` and calls `parseExpression` (**p3**) on `2` with the precedence of **ADDITION**.
+6. **p3** calls `parsePrefixExpression`, returning the <ins>constant expression</ins> `2`, then it reaches **EOF**. **p3** is terminated (**ADDITION** > **NONE**). Control is returned to **p1**.
+7. The current token is **EOF**, no infix is parsed, **p1** is terminated. (**START** > **NONE**). Done.
