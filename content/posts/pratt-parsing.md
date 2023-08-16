@@ -8,24 +8,27 @@ tags:
   - parsing
   - python
 math: true
-draft: true
 ---
-I was first introduced to the concept of `Pratt Parsing` (top down operator precedence) while reading [Bob Nystrom](https://journal.stuffwithstuff.com/)'s remarkable [crafting interpreters](https://craftinginterpreters.com/), a book which I think everyone should read atleast once in their career. Pratt Parsing, named after its creator [Vaughan Pratt](https://en.wikipedia.org/wiki/Vaughan_Pratt), is a powerful technique used in programming language parsing. It's like having a super-smart friend who can understand complex sentences and break them down into understandable pieces.
+I was first introduced to the concept of `Pratt parsing` (top down operator precedence) while reading [Bob Nystrom](https://journal.stuffwithstuff.com/)'s remarkable [crafting interpreters](https://craftinginterpreters.com/), a book which I think everyone should read atleast once in their career. Pratt parsing, named after its creator [Vaughan Pratt](https://en.wikipedia.org/wiki/Vaughan_Pratt), is a powerful technique used in programming language parsing.
 
-Admittedly it has been quite a while since I've touched the topic of parsing, but I'm hoping to brush off the dust and refresh my memory and hopefully be able to cement the concept for good after this post.
+In this post, I will be demonstrating the concept of Pratt parsing by showing you how we can implement it for a basic expression calculator.
 
-Now with that our introduction out of the way, let's dive straight in.
+Admittedly it has been quite some time since I've done any parsing, but I'm hoping to brush off the dust and refresh my memory and hopefully be able to cement the concept for good after this post.
+
+Now with the introduction out of the way, let's dive straight in.
 
 ## 1. What is Parsing
 So before anything, I'd like to make sure we're on the same page here. It's important you understand what parsing is.
 
-Parsing is like taking apart a sentence to understand its structure using certain rules. Imagine you have a bunch of words, and you want to arrange them in a way that makes sense. You follow some rules to do this, and once you're done, you can see patterns in how the words fit together, making the sentence meaningful.
+Parsing is the process of taking apart a sentence to understand its structure using certain rules. Imagine you have a bunch of words, and you want to arrange them in a way that makes sense. You follow some rules to do this, and once you're done, you can see patterns in how the words fit together, making the sentence meaningful.
 
 I think the concept can be best explained with an example. Consider the following expression:
 $$
 V = 2 \cdot 3 + 3.
 $$
-What is the resulting value of `V` here? You see, in this example there is actually two different ways we can evaluate the expression which will give us two very different results.
+What is the resulting value of `V` here? 
+
+You see, in this example there is actually two different ways we can evaluate the expression which will give us two very different results.
 
 Way **A**:
 $$
@@ -37,7 +40,7 @@ $$
 $$
 
 So... what's the right answer? Well, it's whatever we want it to be. In our case, with respect to **BIDMAS** (or **PEMDAS**), we know that multiplication $(2 \cdot 3)$ takes prece-
-dence over the addition operation $(3 + 3)$, which results in expression of way `A`.
+dence over the addition operation $(3 + 3)$, which results in expression `A`.
 
 It might not be obvious, but internally, what we just did was parsing the expression using the grammatical rules of **BIDMAS**.
 
@@ -56,7 +59,7 @@ Note: The top of the expression/parse tree is evaluated last.
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As we traverse down the tree, the precedence level increases.
 </blockquote>
 
-So before I get into the actual meat of this post, let me just say, parsing is *very* important, especially in programming language processing. It is responsible for translating our human-readable source code into machine-executable instructions. Without effective parsing we would not be able to enjoy the convenience of high level programmming languages.
+So before I get into the actual meat of this post, let me just say, parsing is *very* important, especially in programming language processing. It is responsible for translating our human-readable source code into machine-executable instructions. Infact, without effective parsing we would not be able to enjoy the convenience of high level programmming languages.
 
 ## 2. The Goal 
 To demonstrate how the Pratt parser works, we're going to be building a basic Pratt parser for evaluating mathematical expressions from scratch. I could bore you with heaps of nitty-gritty details about the technique but that's probably not what you're here for, and quite frankly, neither of us would enjoy that. So instead, I will sprinkle relevant details I think you should know at each stage of the implementation.
@@ -78,7 +81,7 @@ from dataclasses import dataclass
 # 1. Number
 # 2. Operator
 # 3. Parenthesis
-# 4. ILLEGAL & End Of File
+# 4. Illegal & End Of File
 TokenType = Enum(
     "Token", ["ILLEGAL", "INTEGER", "PLUS",
               "MINUS", "MULT", "DIV", "LPAREN", "RPAREN", "EOF"]
@@ -191,8 +194,8 @@ class Parser:
 
 Alright great, now our parser is sufficient. Let's get started.
 
-## 4. Prefix expressions
-Alas, we've reached the first boss. Incase you're unfamiliar, a prefix expression is either a **number** [2, 5, 10], or an **unary** expression which is an expression preceded by an operator [-2, -5, -(-10)].  In Pratt parsing, this is the first thing you parse, so let's setup to do exactly that.
+## 4. Prefix Expressions
+Alas, we've reached the first boss. Incase you're unfamiliar, a prefix expression is either a **number** `2, 5, 10`, or an **unary** expression which is an expression preceded by an operator `-2, -5, -(-10)`.  In Pratt parsing, this is the first thing you parse, so let's setup to do exactly that.
 
 {{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
@@ -215,6 +218,8 @@ class Parser:
         
 {{< /highlight>}}
 {{< /codeblock>}}
+
+<ins>**Constant Expressions**</ins>
 
 Great, now we can start with parsing the simplest form of an expression: constant expressions (2, 5, 10). We'll need to add another type for that.
 
@@ -261,6 +266,8 @@ Parser("900").parseExpression() # ConstantExpression(expr=900)
 {{< /highlight>}}
 {{< /codeblock>}}
 
+<ins>**Unary Expressions**</ins>
+
 Now let's move onto parsing unary expressions. Again, we have to add a new type.
 {{< codeblock name= "Expression Types" >}}
 {{< highlight python >}}
@@ -299,7 +306,7 @@ def parsePrefixExpression(self, token: Token) -> Expression:
 {{< /codeblock>}}
 
 
-Great, now we can try parsing some unary expressions
+Great, now we can try parsing some unary expressions.
 
 {{< codeblock name= "Parsing unary expressions" >}}
 {{< highlight python >}}
@@ -317,5 +324,152 @@ b = Parser("- - 42").parseExpression()
 #               expr=ConstantExpression(expr=42)
 #       )
 # )
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Now that the expression tree can be constructed properly, let's take it a step further and actually evaluate the expression.
+
+{{< codeblock name= "Parsing unary expressions" >}}
+{{< highlight python >}}
+@dataclass
+class ConstantExpression:
+    # ...
+    # Return the constant value
+    def value(self):
+        return self.expr
+
+@dataclass
+class UnaryExpression:
+    # ...
+    def value(self):
+        match self.operator_token:
+            # Negate the result of the expression
+            case TokenType.MINUS:
+                return -self.expr.value()
+        print(f"Error! Can't evaluate the value for {self.operator_token}")
+{{< /highlight>}}
+{{< /codeblock>}}
+
+As you can see the evaluation process is very simple. The constant expression is our base case, the call to **value()** will simply return the integer which it holds. As for the unary expression, we simply have to call **value()** on the expression and apply the operator.
+
+{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< highlight python >}}
+Parser("- 2").parseExpression().value()       # -2
+Parser("- - 42").parseExpression().value()    # 42
+Parser("- - - 900").parseExpression().value() # -900
+{{< /highlight>}}
+{{< /codeblock>}}
+
+And now we're done, yep that's it for prefixes.
+
+## 5. Infix Expressions
+
+It's time for the second boss, the *infix expression*. Again, incase you're unfaimiliar, an infix expressions is an expression with an operator *in* between two operands.
+
+As a first step, we are aiming to parse the following expression: `-2 + 2`. 
+
+Let's see how our parser fares so far.
+
+{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< highlight python >}}
+Parser("- 2 + 2").parseExpression()
+# returns UnaryExpression(operator_token=<Token.MINUS: 4>, expr=ConstantExpression(expr=2)){{< /highlight>}}
+{{< /codeblock>}}
+
+To no surprise, it isn't working properly, but thankfully we can cleary see why. The problem is that we stop parsing after we have finished with the infix expression. Let's fix that.
+
+Once again, we begin by defining a new expression type.
+
+{{< codeblock name= "Expression Types" >}}
+{{< highlight python >}}
+@dataclass
+class BinaryExpression:
+    lhs: Expression
+    operator_token: TokenType
+    rhs: Expression
+{{< /highlight>}}
+{{< /codeblock>}}
+Now we can modify our `parseExpression` function. We just have to check whether the next token after the infix expression is **EOF** or not. If it isn't then we can begin parsing our infix expression.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parseExpression(self) -> Expression:
+    # Parse prefix...
+
+    # Parse infix expression
+    if self.read() != EOF_TOKEN:    
+        token = self.advance()
+        expr = self.parseInfixExpression(token, expr)
+
+    return expr
+{{< /highlight>}}
+{{< /codeblock>}}
+
+The `parseInfixExpression` method is almost a mirror of the `parsePrefixExpression`, the only difference is that we need to pass in the left hand side expression.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+    def parseInfixExpression(self, token: Token, expr: Expression):
+        match token.token_type:
+            case TokenType.PLUS | TokenType.MINUS | TokenType.DIV | TokenType.MULT:
+                return BinaryExpression(expr, token.token_type, self.parseExpression())
+            case _:
+                print(f"Error, no matching infix rule found for: {token}")
+                return None
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Ha, wasn't that easy? Let's give it a whirl.
+{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< highlight python >}}
+Parser("- 2 + 2").parseExpression()
+# UnaryExpression(
+#   operator_token=<Token.MINUS: 4>,
+#   expr=BinaryExpression(
+#           lhs=ConstantExpression(expr=2),      ====>   -(2+2) Wrong!!!
+#           operator_token=<Token.PLUS: 3>, 
+#           rhs=ConstantExpression(expr=2)
+#       )
+#   )
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Oh... that's awkard... It seems like the recursive call to `parseExpression` from the initial `parsePrefixExpression` call is overextending. Instead of only grabbing the first `2` constant it's grabbing `2 + 2`. 
+
+Thankfully the Pratt parser's arsenal has a weapon that combats exactly this. Let me show you why the Pratt parser is called the `top down operator precedence` parser.
+
+Let's me introduce you to the <ins>**precedence table**</ins>, it should look familiar.
+
+{{< codeblock name= "Precedence Table" >}}
+{{< highlight python >}}
+# Low -> High
+# This is BIDMAS in reverse, with the addition of PREFIX.
+class Precedence(IntEnum):
+    NONE           = 0
+    START          = 1
+    SUBTRACTION    = 2
+    ADDITION       = 3
+    MULTIPLICATION = 4
+    DIVISION       = 5
+    INDICES        = 6
+    PREFIX         = 7
+    BRACKET        = 8
+
+// Create a mapping between tokens and their precedence
+def getPrecedence(token: TokenType) -> Precedence:
+    match token:
+        case TokenType.PLUS:
+            return Precedence.ADDITION
+        case TokenType.MINUS:
+            return Precedence.SUBTRACTION
+        case TokenType.MULT:
+            return Precedence.MULTIPLICATION
+        case TokenType.DIV:
+            return Precedence.DIVISION
+        case TokenType.LPAREN:
+            return Precedence.BRACKET
+        case TokenType.EOF:
+            return Precedence.NONE
+    return Precedence.NONE
 {{< /highlight>}}
 {{< /codeblock>}}
