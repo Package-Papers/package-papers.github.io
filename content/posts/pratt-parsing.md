@@ -8,9 +8,8 @@ tags:
   - parsing
   - python
 math: true
-draft: true
 ---
-I was first introduced to the concept of `Pratt parsing` (top down operator precedence) while reading [Bob Nystrom](https://journal.stuffwithstuff.com/)'s remarkable [crafting interpreters](https://craftinginterpreters.com/), a book which I think everyone should read atleast once in their career. Pratt parsing, named after its creator [Vaughan Pratt](https://en.wikipedia.org/wiki/Vaughan_Pratt), is a powerful technique used in programming language parsing.
+I was first introduced to the concept of `Pratt parsing` (top down operator precedence) while reading [Bob Nystrom](https://journal.stuffwithstuff.com/)'s remarkable [crafting interpreters](https://craftinginterpreters.com/), a book which I think everyone should read at least once in their career. Pratt parsing, named after its creator [Vaughan Pratt](https://en.wikipedia.org/wiki/Vaughan_Pratt), is a powerful technique used in programming language parsing.
 
 In this post, I will be demonstrating the concept of Pratt parsing by showing you how we can implement it for a basic expression calculator.
 
@@ -59,7 +58,7 @@ Note: The top of the expression/parse tree is evaluated last.
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;As we traverse down the tree, the precedence level increases.
 </blockquote>
 
-So before I get into the actual meat of this post, let me just say, parsing is *very* important, especially in programming language processing. It is responsible for translating our human-readable source code into machine-executable instructions. Infact, without effective parsing we would not be able to enjoy the convenience of high level programmming languages.
+So before I get into the actual meat of this post, let me just say, parsing is *very* important, especially in programming language processing. It is responsible for translating our human-readable source code into machine-executable instructions. In fact, without effective parsing we would not be able to enjoy the convenience of high level programming languages.
 
 ## 2. The Goal 
 To demonstrate how the Pratt parser works, we're going to be building a basic Pratt parser for evaluating math expressions from scratch. I could bore you with heaps of nitty-gritty details about the technique but that's probably not what you're here for, and quite frankly, neither of us would enjoy that. So instead, I will sprinkle relevant details I think you should know at each stage of the implementation.
@@ -67,7 +66,7 @@ To demonstrate how the Pratt parser works, we're going to be building a basic Pr
 Let's get started.
 
 ## 3. Lexical Analysis
-Since I'm building everything from complete scratch, I'm going to have to build a lexer first. The role of the lexer is to simply convert raw strings of the source code into tokens. The reason we need to tokenize everything is because by classifying each component, it becomes easier to work with.
+Since I'm building everything from complete scratch, I'm going to have to build a lexer first. The role of the lexer is to simply convert raw strings of the source code into tokens. The reason we need to tokenize everything is because by classifying each component, they become easier to work with.
 
 Since this is only for demonstrative purposes I'm going to keep it as simple as possible. 
 
@@ -84,7 +83,7 @@ from dataclasses import dataclass
 # 4. Illegal & End Of File
 TokenType = Enum(
     "Token",
-    ["ILLEGAL", "INTEGER", "PLUS", "MINUS", "MULT", "DIV", "POW", "LPAREN", "RPAREN", "EOF"],
+    ["ILLEGAL", "NUMBER", "PLUS", "MINUS", "MULT", "DIV", "POW", "LPAREN", "RPAREN", "EOF"],
 )
 
 # A token is just a dataclass holding the
@@ -102,6 +101,13 @@ EOF_TOKEN = Token(TokenType.EOF, "")
 Now that we have defined our tokens, we can make a function to match and return an appropriate token given an input string.
 {{< codeblock name= "The tokenizer" >}}
 {{< highlight python >}}
+
+def isnumber(input: str) -> bool:
+    """
+    Returns true if the input represents an integer or float.
+    """
+    return input.replace(".", "").isdigit()
+
 def tokenize(input: str) -> Token:
     """
     Given a string, return its relevant token.
@@ -122,8 +128,8 @@ def tokenize(input: str) -> Token:
         token_type = TokenType.RPAREN
     elif input == "^":
         token_type = TokenType.POW
-    elif input.isnumeric():
-        token_type = TokenType.INTEGER
+    elif isnumber(input):
+        token_type = TokenType.NUMBER
     else:
         token_type = TokenType.ILLEGAL
 
@@ -155,7 +161,7 @@ So now we can properly tokenize any given expression like this:
 {{< highlight python >}}
 input = "1 + ( 2 * 3 ) - 4 / 2"
 token_stream = lex(input) 
-# [Token(token_type=<Token.INTEGER: 2>, lexeme='1'), Token(token_type=<Token.PLUS: 3>, ...
+# [Token(token_type=<Token.NUMBER: 2>, lexeme='1'), Token(token_type=<Token.PLUS: 3>, ...
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -225,13 +231,13 @@ class Parser:
 
 Great, now we can start with parsing the simplest form of an expression: **constant expressions** (`2, 5, 10`). We'll begin by defining a new type.
 
-{{< codeblock name= "Expression Types" >}}
+{{< codeblock name= "Defining the ConstantExpression type" >}}
 {{< highlight python >}}
 Expression = Any
 
 @dataclass 
 class ConstantExpression:
-    expr: int
+    expr: float
 
     # For debugging.
     def __str__(self):
@@ -239,12 +245,12 @@ class ConstantExpression:
 {{< /highlight>}}
 {{< /codeblock>}}
 
-Parsing a constant value is trivial, we just have to convert the lexeme into an integer.
+Parsing a constant value is trivial, we just have to convert the lexeme into its numerical value.
 
 {{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
 def parseConstantExpression(self, token: Token) -> ConstantExpression:
-    return ConstantExpression(int(token.lexeme))
+    return ConstantExpression(float(token.lexeme))
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -254,7 +260,7 @@ Now we just have to wire it into our `parsePrefixExpression` method.
 {{< highlight python >}}
 def parsePrefixExpression(self, token: Token) -> Expression:
     match token.token_type:
-        case TokenType.INTEGER: # Constant Expression
+        case TokenType.NUMBER: # Constant Expression
             return self.parseConstantExpression(token)
         case _: # Unexpected token found
             print(f"Error, no matching prefix rule found for: {token}")
@@ -266,16 +272,16 @@ And now we can actually parse numbers! Let's give it a try.
 
 {{< codeblock name= "Parsing constant expressions" >}}
 {{< highlight python >}}
-Parser("2").parseExpression()   # ConstantExpression(expr=2)
-Parser("42").parseExpression()  # ConstantExpression(expr=42)
-Parser("900").parseExpression() # ConstantExpression(expr=900)
+Parser("2").parseExpression()   # ConstantExpression(expr=2.0)
+Parser("42").parseExpression()  # ConstantExpression(expr=42.0)
+Parser("900").parseExpression() # ConstantExpression(expr=900.0)
 {{< /highlight>}}
 {{< /codeblock>}}
 
 <ins>**Unary Expressions**</ins>
 
 Now let's move onto parsing **unary expressions**. Again, we have to add a new type.
-{{< codeblock name= "Expression Types" >}}
+{{< codeblock name= "Defining the UnaryExpression type" >}}
 {{< highlight python >}}
 @dataclass
 class UnaryExpression:
@@ -294,7 +300,7 @@ Getting the operator token is trivial, we can extract it straight from the curre
 
 Oh! There is nothing stopping us from calling `parseExpression`! We can just throw the work of figuring out the expression to it. Now parsing unary expressions becomes trivial.
 
-{{< codeblock name= "Expression Types" >}}
+{{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
 def parseUnaryExpression(self, token: Token) -> UnaryExpression:
     return UnaryExpression(token, self.parseExpression())
@@ -323,7 +329,7 @@ Great, now we can try parsing some unary expressions.
 a = Parser("- 2").parseExpression()
 # a = UnaryExpression(
 #       operator_token=<Token.MINUS: 4>,  
-#       expr=ConstantExpression(expr=2)
+#       expr=ConstantExpression(expr=2.0)
 # )
 
 print(a) # -(2)
@@ -333,7 +339,7 @@ b = Parser("- - 42").parseExpression()
 #       operator_token=<Token.MINUS: 4>, 
 #       expr=UnaryExpression(
 #               operator_token=<Token.MINUS: 4>, 
-#               expr=ConstantExpression(expr=42)
+#               expr=ConstantExpression(expr=42.0)
 #       )
 # )
 
@@ -343,7 +349,7 @@ print(b) # -(-(42))
 
 Now that the expression tree can be constructed properly, let's take it a step further and actually be able to evaluate the expression.
 
-{{< codeblock name= "Parsing unary expressions" >}}
+{{< codeblock name= "Adding a method to evaluate prefix expressions" >}}
 {{< highlight python >}}
 @dataclass
 class ConstantExpression:
@@ -370,9 +376,9 @@ As you can see the evaluation process is very simple. The constant expression is
 
 {{< codeblock name= "Evaluating prefix expressions" >}}
 {{< highlight python >}}
-Parser("- 2").parseExpression().value()       # -2
-Parser("- - 42").parseExpression().value()    # 42
-Parser("- - - 900").parseExpression().value() # -900
+Parser("- 2").parseExpression().value()       # -2.0
+Parser("- - 42").parseExpression().value()    # 42.0
+Parser("- - - 900").parseExpression().value() # -900.0
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -380,7 +386,7 @@ And now we're done, yep that's it for prefixes.
 
 ## 5. Infix Expressions
 
-It's time for the second boss, the *infix expression*. Again, incase you're unfaimiliar, an infix expressions is an expression with an operator *in* between two operands.
+It's time for the second boss, the *infix expression*. Again, incase you're unfamiliar, an infix expressions is an expression with an operator *in* between two operands.
 
 As a first step, we are aiming to parse the following expression: `2 + 2`.
 
@@ -388,17 +394,17 @@ Let's see how our parser fares so far.
 
 {{< codeblock name= "Evaluating infix expressions" >}}
 {{< highlight python >}}
-Parser("2 + 2").parseExpression() # ConstantExpression(expr=2)
+Parser("2 + 2").parseExpression() # ConstantExpression(expr=2.0)
 {{< /highlight>}}
 {{< /codeblock>}}
 
-To no surprise, it isn't working properly, but thankfully we can cleary see why. The problem is that we stop parsing right after we have finished with the **prefix** expression. 
+To no surprise, it isn't working properly, but thankfully we can clearly see why. The problem is that we stop parsing right after we have finished with the **prefix** expression. 
 
 Let's fix that.
 
 Once again, we begin by defining a new expression type.
 
-{{< codeblock name= "Expression Types" >}}
+{{< codeblock name= "Defining the BinaryExpression Type" >}}
 {{< highlight python >}}
 @dataclass
 class BinaryExpression:
@@ -419,7 +425,7 @@ def parseExpression(self) -> Expression:
     # Parse prefix...
 
     # Parse infix expression
-    if self.read() != EOF_TOKEN:    
+    if !self.expect(TokenType.EOF):    
         token = self.advance()
         expr = self.parseInfixExpression(token, expr)
 
@@ -446,7 +452,7 @@ def parseInfixExpression(self, token: Token, expr: Expression):
 {{< /codeblock>}}
 
 Ha, wasn't that easy? Let's try parsing again.
-{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< codeblock name= "Evaluating infix expressions" >}}
 {{< highlight python >}}
 print(Parser("2 + 2").parseExpression())             # (2 + 2)
 print(Parser("2 + 2 + 3").parseExpression())         # (2 + (2 + 3))
@@ -456,7 +462,7 @@ print(Parser("1 + 2 + 3 + 4 + 5").parseExpression()) # (1 + (2 + (3 + (4 + 5))))
 
 Great now that we can parse infixes, let's make a method for evaluating them.
 
-{{< codeblock name= "Expression Types" >}}
+{{< codeblock name= "Adding a method to evaluate binary expressions" >}}
 {{< highlight python >}}
 @dataclass
 class BinaryExpression:
@@ -480,18 +486,26 @@ class BinaryExpression:
 {{< /highlight>}}
 {{< /codeblock>}}
 
+{{< codeblock name= "Evaluating infix expressions" >}}
+{{< highlight python >}}
+print(Parser("2 + 2").parseExpression().value())             # 4.0
+print(Parser("2 + 2 + 3").parseExpression().value())         # 7.0
+print(Parser("1 + 2 + 3 + 4 + 5").parseExpression().value()) # 15.0
+{{< /highlight>}}
+{{< /codeblock>}}
+
 Okay, but we have a new problem now, consider the following:
 
-{{< codeblock name= "Not handling precedence properly" >}}
+{{< codeblock name= "Not handling infix precedence" >}}
 {{< highlight python >}}
 a = Parser("2 * 3 + 3").parseExpression()
 # BinaryExpression(
-#     lhs=ConstantExpression(expr=2), 
+#     lhs=ConstantExpression(expr=2.0), 
 #     operator_token=<Token.MULT: 5>, 
 #     rhs=BinaryExpression(
-#         lhs=ConstantExpression(expr=3),
+#         lhs=ConstantExpression(expr=3.0),
 #         operator_token=<Token.PLUS: 3>, 
-#         rhs=ConstantExpression(expr=3)
+#         rhs=ConstantExpression(expr=3.0)
 #     )
 # )
 
@@ -499,13 +513,13 @@ print(a) # (2 * (3 + 3))  <-- Oh no!
 {{< /highlight>}}
 {{< /codeblock>}}
 
-As you can see the parser is grouping all operands to the right, it is treating all operators as *right-associative*. To fix this, we have to introduce the concept of **operator precedence** to our parser.
+As you can see the parser is grouping all operands to the right, it is treating all operators as *right-associative*. To fix this, we have to introduce the concept of **operator precedence** to the parser.
 
 ## 6. Handling Precedence
 
 Allow me to introduce you to the <ins>**precedence table**</ins>, it should look familiar.
 
-{{< codeblock name= "Precedence Table" >}}
+{{< codeblock name= "The precedence table" >}}
 {{< highlight python >}}
 # Precedence: Low -> High
 # This is just BIDMAS
@@ -516,7 +530,6 @@ class Precedence(IntEnum):
     MULTIPLICATION = 3
     DIVISION       = 4
     INDICES        = 5
-    BRACKET        = 6
 
 def getPrecedence(token: TokenType) -> Precedence:
     """
@@ -585,7 +598,7 @@ While we're at it, lets also create a new entry point for parsing.
 {{< highlight python >}}
 
 # We parse starting from the lowest valid precedence possible. 
-# This means that it will only stop once we reach EOF, since Precendence.NONE is lower.
+# This means that it will only stop once we reach EOF, since Precedence.NONE is lower.
 def parse(self) -> Expression:
     return self.parseExpression(Precedence.SUBTRACTION)
 {{< /highlight>}}
@@ -593,13 +606,13 @@ def parse(self) -> Expression:
 
 Now we can try to parse again.
 
-{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< codeblock name= "Evaluating infix with proper priority" >}}
 {{< highlight python >}}
 Parser("2 * 3 + 3").parse()
 # BinaryExpression(
-#     lhs=ConstantExpression(expr=2), 
+#     lhs=ConstantExpression(expr=2.0), 
 #     operator_token=<Token.MULT: 5>,     ---->    (2 * 3)
-#     rhs=ConstantExpression(expr=3)
+#     rhs=ConstantExpression(expr=3.0)
 # )
 {{< /highlight>}}
 {{< /codeblock>}}
@@ -631,17 +644,17 @@ Note: We will always be able to parse since we can always fallback onto the init
 
 And now we can try to parse our expression again.
 
-{{< codeblock name= "Evaluating expressions" >}}
+{{< codeblock name= "Evaluating infix with proper precedence handling" >}}
 {{< highlight python >}}
 Parser("2 * 3 + 3").parse()
 # BinaryExpression(
 #     lhs=BinaryExpression(
-#         lhs=ConstantExpression(expr=2),
+#         lhs=ConstantExpression(expr=2.0),
 #         operator_token=<Token.MULT: 5>, 
-#         rhs=ConstantExpression(expr=3)    ---->    ((2 * 3) + 3)
+#         rhs=ConstantExpression(expr=3.0)    ---->    ((2 * 3) + 3)
 #     ), 
 #     operator_token=<Token.PLUS: 3>, 
-#     rhs=ConstantExpression(expr=3)
+#     rhs=ConstantExpression(expr=3.0)
 # )
 {{< /highlight>}}
 {{< /codeblock>}}
@@ -652,15 +665,15 @@ At the moment, we are parsing prefix expressions with the precedence level of `P
 
 Consider the following example:
 
-{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< codeblock name= "Not handling prefix precedence" >}}
 {{< highlight python >}}
 a = Parser("- 2 + 2").parse()
 # UnaryExpression(
 #   operator_token=<Token.MINUS: 4>,
 #   expr=BinaryExpression(
-#           lhs=ConstantExpression(expr=2),
+#           lhs=ConstantExpression(expr=2.0),
 #           operator_token=<Token.PLUS: 3>, 
-#           rhs=ConstantExpression(expr=2)
+#           rhs=ConstantExpression(expr=2.0)
 #       )
 #   )
 
@@ -668,8 +681,8 @@ print(a) # -((2 + 2))  <-- Wrong
 {{< /highlight>}}
 {{< /codeblock>}}
 
-In order to support proper prefix precedence, we'll add a new precedence level. Since we know that indices and brackets takes precedence over the prefix, we'll insert it right before them.
-{{< codeblock name= "Precedence Table" >}}
+In order to support proper prefix precedence, we'll add a new precedence level. Since we know that indices takes precedence over the prefix, we'll insert it right before `Precedence.INDICES`.
+{{< codeblock name= "The precedence table" >}}
 {{< highlight python >}}
 class Precedence(IntEnum):
     # ...
@@ -682,7 +695,7 @@ class Precedence(IntEnum):
 
 Now we refactor `parseUnaryExpression` to call `parseExpression` with `precedence.PREFIX`.
 
-{{< codeblock name= "Parser class" >}}
+{{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
 def parseUnaryExpression(self, token: Token) -> UnaryExpression:
     return UnaryExpression(token, self.parseExpression(Precedence.PREFIX))
@@ -691,7 +704,7 @@ def parseUnaryExpression(self, token: Token) -> UnaryExpression:
 
 And that's it! Yep, that's all we had to do it fix it.
 
-{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< codeblock name= "Evaluating with proper prefix precedence" >}}
 {{< highlight python >}}
 print(Parser("- 2 + 2").parse()) # (-(2) + 2)
 {{< /highlight>}}
@@ -704,25 +717,32 @@ Here is our final boss. Grouped expressions are exactly as the name implies, the
 
 Thankfully with the experience we have so far, we are quite well equipped to deal with them.
 
-Since we see that the operator `(` appears before the operand, we know right away that it is a type of *prefix* expression. So let's make a new method for parsing grouped expressions and wire it up.
+The first observation we can make is that the `(` operator appears before the operand, we know right away that this must be a type of *prefix* expression. So let's wire it up.
 
 {{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
+# We wire it here.
 def parsePrefixExpression(self, token: Token) -> Expression:
     match token.token_type:
         # ...
         case TokenType.LPAREN:
             return self.parseGroupedExpression()
         # ...
+{{< /highlight>}}
+{{< /codeblock>}}
+
+And here comes the implementation.
         
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
 def parseGroupedExpression(self):
     # Parse from the lowest valid precedence. We will consume everything up 
-    # until either `)` or `EOF` is reached. (They both return `Precedence.NONE`)
+    # until we reach either `)` or `EOF` is reached. (They both return `Precedence.NONE`)
     expr = self.parseExpression(Precedence.SUBTRACTION)
 
-    # We expect the current token to be `)`, hence why the parsing stopped.
+    # After we finish parsing the expression, we expect the current token to be `)`.
     if self.expect(TokenType.RPAREN):
-        # If it is, we consume it so the context we jump back to can 
+        # We consume the `)` token so the context we jump back to can 
         # continue parsing properly, starting from the next token.
         self.advance()
         return expr
@@ -731,3 +751,18 @@ def parseGroupedExpression(self):
         return None
 {{< /highlight>}}
 {{< /codeblock>}}
+
+This blew my mind when I first saw it.
+
+Here's a little explanation. Since we know that the expression should be able to parse everything starting from the opening parenthesis up until the closing parenthesis, we have start our precedence at the very *bottom* (`SUBTRACTION`!). We know that the parsing process for the expression should only stop once we reach the matching `)` token, this means that we just have to set the precedence of the closing parenthesis to `NONE` (Which is already true thanks to our default case in `getPrecedence`).
+
+And with that we are officially done with our parser!
+
+## Remarks
+Writing this was *much* more difficult than I thought it would be, but it was also quite enjoyable. More than anything, I hope that you've found it resourceful.
+
+I apologize if you found the format to be a little annoying to follow. I tend to begin with an incomplete implementation which partially works then slowly correct it, rather than just showing you the correct implementation right away. Doing so requires quite a lot of jumping around and refactoring which might be annoying, but I think that slowly building up to the solution is much better for learning than just giving one.
+
+On a side note, images and figures aren't properly integrated yet so most of the content is just a wall of text, but you can expect that to change in newer posts.
+
+Thankyou for reading!
