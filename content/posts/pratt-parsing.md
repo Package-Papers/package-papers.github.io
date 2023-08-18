@@ -189,8 +189,8 @@ class Parser:
         return self.tokens[self.current + 1]
 
     # Returns whether the current token matches the expected token
-    def expect(self, token: Token) -> bool:
-        return self.read() == token 
+    def expect(self, token: TokenType) -> bool:
+        return self.read().token_type == token 
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -386,13 +386,13 @@ As a first step, we are aiming to parse the following expression: `2 + 2`.
 
 Let's see how our parser fares so far.
 
-{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< codeblock name= "Evaluating infix expressions" >}}
 {{< highlight python >}}
 Parser("2 + 2").parseExpression() # ConstantExpression(expr=2)
 {{< /highlight>}}
 {{< /codeblock>}}
 
-To no surprise, it isn't working properly, but thankfully we can cleary see why. The problem is that we stop parsing right after we have finished with the infix expression. 
+To no surprise, it isn't working properly, but thankfully we can cleary see why. The problem is that we stop parsing right after we have finished with the **prefix** expression. 
 
 Let's fix that.
 
@@ -411,7 +411,7 @@ class BinaryExpression:
         return f"({self.lhs} {self.operator_token.lexeme} {self.rhs})"
 {{< /highlight>}}
 {{< /codeblock>}}
-Now we can modify our `parseExpression` function to check whether the current token is **EOF** or not. If it isn't then we parse the infix expresion.
+Now we can modify our `parseExpression` method to check whether the current token is **EOF** or not. If it isn't then we parse the infix expression.
 
 {{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
@@ -427,7 +427,7 @@ def parseExpression(self) -> Expression:
 {{< /highlight>}}
 {{< /codeblock>}}
 
-The `parseInfixExpression` function is almost a mirror of the `parsePrefixExpression`, the only difference is that we need to also pass in the left hand side expression.
+The `parseInfixExpression` method is almost a mirror of the `parsePrefixExpression`, the only difference is that we need to also pass in the left hand side expression.
 
 {{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
@@ -454,11 +454,35 @@ print(Parser("1 + 2 + 3 + 4 + 5").parseExpression()) # (1 + (2 + (3 + (4 + 5))))
 {{< /highlight>}}
 {{< /codeblock>}}
 
-Great now we can parse infixes. 
+Great now that we can parse infixes, let's make a method for evaluating them.
+
+{{< codeblock name= "Expression Types" >}}
+{{< highlight python >}}
+@dataclass
+class BinaryExpression:
+    # ...
+
+    def value(self):
+        match self.operator_token.token_type:
+            case TokenType.PLUS:
+                return self.lhs.value() + self.rhs.value()
+            case TokenType.MINUS:
+                return self.lhs.value() - self.rhs.value()
+            case TokenType.MULT:
+                return self.lhs.value() * self.rhs.value()
+            case TokenType.DIV:
+                return self.lhs.value() / self.rhs.value()
+            case TokenType.POW:
+                return self.lhs.value() ** self.rhs.value()
+            case _:
+                print(f"Error! Can't evaluate the value for {self.operator_token}")
+                return None
+{{< /highlight>}}
+{{< /codeblock>}}
 
 Okay, but we have a new problem now, consider the following:
 
-{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< codeblock name= "Not handling precedence properly" >}}
 {{< highlight python >}}
 a = Parser("2 * 3 + 3").parseExpression()
 # BinaryExpression(
@@ -494,8 +518,11 @@ class Precedence(IntEnum):
     INDICES        = 5
     BRACKET        = 6
 
-# Create a mapping between tokens and their precedence
 def getPrecedence(token: TokenType) -> Precedence:
+    """
+    Given an infix operator, return its precedence level.
+    """
+
     match token:
         case TokenType.PLUS:
             return Precedence.ADDITION
@@ -518,11 +545,12 @@ def getPrecedence(token: TokenType) -> Precedence:
 Note: The precedence table will differ depending on what you are parsing.
 </blockquote>
 
-Now we refactor the `parseExpression` function to pass in the precedence as a parameter. We will also use it to determine whether we parse the infix or not.
+Now we refactor the `parseExpression` method to pass in the precedence as a parameter. We will use it to determine whether we parse the infix or not.
 
 {{< codeblock name= "The parser class" >}}
 {{< highlight python >}}
-def parseExpression(self, precedence: Precedence) -> Expression:
+# Note: I am setting a default value so parsePrefixExpression does not throw an error.
+def parseExpression(self, precedence: Precedence = Precedence.SUBTRACTION) -> Expression:
     # Parse prefix expression...
 
     # We will parse the infix IF the precedence of the 
@@ -532,6 +560,23 @@ def parseExpression(self, precedence: Precedence) -> Expression:
         expr = self.parseInfixExpression(token, expr)
 
     return expr
+{{< /highlight>}}
+{{< /codeblock>}}
+
+We have to refactor `parseInfixExpression` to use the infix operator's precedence.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parseInfixExpression(self, token: Token, expr: Expression):
+    match token.token_type:
+        case TokenType.PLUS | TokenType.MINUS | ...:
+            return BinaryExpression(
+                expr,
+                token,
+                self.parseExpression(getPrecedence(token.token_type)),
+            )
+        case _:
+            ...
 {{< /highlight>}}
 {{< /codeblock>}}
 
@@ -577,7 +622,7 @@ def parseExpression(self, precedence: Precedence) -> Expression:
     return expr
 {{< /highlight>}}
 {{< /codeblock>}}
-By turning the process of infix parsing into a while loop, we can now return to the previous context once the current one is terminated.
+By turning the process of parsing an infix into a while loop, we can now return to the previous context once the current one is terminated.
 
 <blockquote>
 Note: We will always be able to parse since we can always fallback onto the initial 
@@ -586,7 +631,7 @@ Note: We will always be able to parse since we can always fallback onto the init
 
 And now we can try to parse our expression again.
 
-{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< codeblock name= "Evaluating expressions" >}}
 {{< highlight python >}}
 Parser("2 * 3 + 3").parse()
 # BinaryExpression(
@@ -598,5 +643,91 @@ Parser("2 * 3 + 3").parse()
 #     operator_token=<Token.PLUS: 3>, 
 #     rhs=ConstantExpression(expr=3)
 # )
+{{< /highlight>}}
+{{< /codeblock>}}
+
+## 7. Prefix Precedence
+
+At the moment, we are parsing prefix expressions with the precedence level of `Precedence.SUBTRACTION` which is the default value of `parseExpression`. This isn't ideal because the `parseExpression` call of `parseUnaryExpression` will overextend and grab more than it should. 
+
+Consider the following example:
+
+{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< highlight python >}}
+a = Parser("- 2 + 2").parse()
+# UnaryExpression(
+#   operator_token=<Token.MINUS: 4>,
+#   expr=BinaryExpression(
+#           lhs=ConstantExpression(expr=2),
+#           operator_token=<Token.PLUS: 3>, 
+#           rhs=ConstantExpression(expr=2)
+#       )
+#   )
+
+print(a) # -((2 + 2))  <-- Wrong
+{{< /highlight>}}
+{{< /codeblock>}}
+
+In order to support proper prefix precedence, we'll add a new precedence level. Since we know that indices and brackets takes precedence over the prefix, we'll insert it right before them.
+{{< codeblock name= "Precedence Table" >}}
+{{< highlight python >}}
+class Precedence(IntEnum):
+    # ...
+    DIVISION       = 4
+    PREFIX         = 5
+    INDICES        = 6
+    # ...
+{{< /highlight>}}
+{{< /codeblock>}}
+
+Now we refactor `parseUnaryExpression` to call `parseExpression` with `precedence.PREFIX`.
+
+{{< codeblock name= "Parser class" >}}
+{{< highlight python >}}
+def parseUnaryExpression(self, token: Token) -> UnaryExpression:
+    return UnaryExpression(token, self.parseExpression(Precedence.PREFIX))
+{{< /highlight>}}
+{{< /codeblock>}}
+
+And that's it! Yep, that's all we had to do it fix it.
+
+{{< codeblock name= "Evaluating prefix expressions" >}}
+{{< highlight python >}}
+print(Parser("- 2 + 2").parse()) # (-(2) + 2)
+{{< /highlight>}}
+{{< /codeblock>}}
+
+
+## 8. Grouped Expressions
+
+Here is our final boss. Grouped expressions are exactly as the name implies, they are expressions which are grouped together via parentheses. E.g. `-(2+2)`, `(2+3)*3`.
+
+Thankfully with the experience we have so far, we are quite well equipped to deal with them.
+
+Since we see that the operator `(` appears before the operand, we know right away that it is a type of *prefix* expression. So let's make a new method for parsing grouped expressions and wire it up.
+
+{{< codeblock name= "The parser class" >}}
+{{< highlight python >}}
+def parsePrefixExpression(self, token: Token) -> Expression:
+    match token.token_type:
+        # ...
+        case TokenType.LPAREN:
+            return self.parseGroupedExpression()
+        # ...
+        
+def parseGroupedExpression(self):
+    # Parse from the lowest valid precedence. We will consume everything up 
+    # until either `)` or `EOF` is reached. (They both return `Precedence.NONE`)
+    expr = self.parseExpression(Precedence.SUBTRACTION)
+
+    # We expect the current token to be `)`, hence why the parsing stopped.
+    if self.expect(TokenType.RPAREN):
+        # If it is, we consume it so the context we jump back to can 
+        # continue parsing properly, starting from the next token.
+        self.advance()
+        return expr
+    else:
+        print("Error: Missing closing parenthesis")
+        return None
 {{< /highlight>}}
 {{< /codeblock>}}
