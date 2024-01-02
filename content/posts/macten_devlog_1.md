@@ -27,7 +27,7 @@ In `C` we can define a parameterless macro using the `#define` pre-preprocessor 
 {{< codeblock name= "C declaration example" >}}
 {{< highlight c >}}
 // Defining constants.
-#define PI 3.14159
+#define PI 3.14159f
 {{< /highlight>}}
 {{< /codeblock>}}
 Now we can call it in our code like so:
@@ -50,5 +50,19 @@ Here is an example of how a macro which takes in parameters can be declared:
 {{< highlight c >}}
 // `##` is a special operator used by the pre-processor to concatenate tokens together.
 #define JOIN(a,b) a ## b
+
+#define PI 3.14159f
+#define CALCULATE_CIRCLE_AREA_FROM_RADIUS(radius) (radius * radius * PI)
 {{< /highlight>}}
 {{< /codeblock>}}
+Now, we can call it like this:
+{{< codeblock name= "C usage example" >}}
+{{< highlight c >}}
+void foo()
+{
+  // Expands into: float var1 = (0.5f * 0.5f * PI);
+  float JOIN(var, 1) = CALCULATE_CIRCLE_AREA_FROM_RADIUS(0.5f);
+}
+{{< /highlight>}}
+{{< /codeblock>}}
+It should be noted that you should always stick to using a function where applicable, unless you have a *very* good reason to use macros. Macros are *not* intended to be an alternative for functions. Macro usage should be strictly reserved for specific actions which normal functions are incapable of, like what `JOIN` does for instance.
