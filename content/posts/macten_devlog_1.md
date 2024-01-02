@@ -41,3 +41,14 @@ float calculate_circle_area(float radius)
 {{</highlight>}}
 {{</codeblock>}}
 As you can see, macros can be used to help improve readability, instead of using magic numbers we can instead use macros. Of course it's also fully valid to use a variable but for historical reasons macros were required because there was no such thing as a const qualifier in prior versions of C.
+
+## 2.2 Parameters
+A macro can also be fed arguments as if it were a function. One thing to take note of is that the call site of the macro may look exactly identical to the call site of a function (atleast in the case of `C`'s `#define`) and this may lead to a bunch of maintenance issues. To mitigate this problem, a convention is often adopted.
+
+Here is an example of how a macro which takes in parameters can be declared:
+{{< codeblock name= "C declaration example" >}}
+{{< highlight c >}}
+// `##` is a special operator used by the pre-processor to concatenate tokens together.
+#define JOIN(a,b) a ## b
+{{< /highlight>}}
+{{< /codeblock>}}
