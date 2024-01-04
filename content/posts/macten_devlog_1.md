@@ -66,3 +66,24 @@ void foo()
 {{< /highlight>}}
 {{< /codeblock>}}
 It should be noted that you should always stick to using a function where applicable, unless you have a *very* good reason to use macros. Macros are *not* intended to be an alternative for functions. Macro usage should be strictly reserved for specific actions which normal functions are incapable of, like what `JOIN` does for instance.
+
+## 2.3 Multi-line macro
+
+While it might not exactly be a type of macro by itself, I think it's important to mention anyways. Macros are not restricted to only be one-liners. 
+
+In C, you might have seen something like this:
+{{< codeblock name= "C multi-line macro" >}}
+{{< highlight c >}}
+#define foo(...)    \
+  do {              \
+    // stmt 1...    \
+    // stmt 2...    \
+  } while (0)
+{{< /highlight>}}
+{{< /codeblock>}}
+The `do {...} while (0)` is a well known trick used for bundling statements together. By using the do-while trick, we can invoke the multi-line macro and terminate it with a `;` as we would with any other function. 
+
+While it's true that we could also just not include a `;` at the end of the last statement, the problem with this is that it introduces another point of maintenance, if another statement were to be added you would have to be mindful of it. Additionally, when you expand the macro, you can also clearly see the statements which belongs in the macro block.
+
+Notice that at the end of each line the backslash character `\` is needed. By using the backslash character before the newline, the newline is skipped, allowing the macro to continue consuming the next line. This is required due to how macros are scanned, it seems to follow the following syntax: `<#define> <body> <newline>`. While it might not seem like a big deal, this is actually a very big flaw. If there is any other character after the newline, perhaps a space, your macro would be broken, without you being able to tell why.
+
