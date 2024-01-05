@@ -19,8 +19,9 @@ More than anything, `Macten` serves as a learning project for me. Regardless of 
 
 # 2. Primer
 In case you are not familiar with macros, let's have a little primer on what macros are and what they look like in the wild.
-
-## 2.1 Parameterless macro
+## 2.1 C
+Let's start with the most basic example of a macro system in a langauge, of course it's from our beloved `C`.
+### 2.1.1 Parameterless
 As the name implies, a parameterless macro is a macro which takes in no input. This is also the most basic type of macro since it is simply just string substitution.
 
 In `C` we can define a parameterless macro using the `#define` pre-preprocessor directives.
@@ -42,7 +43,7 @@ float calculate_circle_area(float radius)
 {{</codeblock>}}
 As you can see, macros can be used to help improve readability, instead of using magic numbers we can instead use macros. Of course it's also fully valid to use a variable but for historical reasons macros were required because there was no such thing as a const qualifier in prior versions of C.
 
-## 2.2 Parameters
+### 2.1.2 Macro with args
 A macro can also be fed arguments as if it were a function. One thing to take note of is that the call site of the macro may look exactly identical to the call site of a function (atleast in the case of `C`'s `#define`) and this may lead to a bunch of maintenance issues. To mitigate this problem, a convention is often adopted.
 
 Here is an example of how a macro which takes in parameters can be declared:
@@ -67,7 +68,7 @@ void foo()
 {{< /codeblock>}}
 It should be noted that you should always stick to using a function where applicable, unless you have a *very* good reason to use macros. Macros are *not* intended to be an alternative for functions. Macro usage should be strictly reserved for specific actions which normal functions are incapable of, like what `JOIN` does for instance.
 
-## 2.3 Multi-line macro
+### 2.1.3 Multi-line macro
 
 While it might not exactly be a type of macro by itself, I think it's important to mention anyways. Macros are not restricted to only be one-liners. 
 
@@ -85,5 +86,40 @@ The `do {...} while (0)` is a well known trick used for bundling statements toge
 
 While it's true that we could also just not include a `;` at the end of the last statement, the problem with this is that it introduces another point of maintenance, if another statement were to be added you would have to be mindful of it. Additionally, when you expand the macro, you can also clearly see the statements which belongs in the macro block.
 
-Notice that at the end of each line the backslash character `\` is needed. By using the backslash character before the newline, the newline is skipped, allowing the macro to continue consuming the next line. This is required due to how macros are scanned, it seems to follow the following syntax: `<#define> <body> <newline>`. While it might not seem like a big deal, this is actually a very big flaw. If there is any other character after the newline, perhaps a space, your macro would be broken, without you being able to tell why.
+Notice that at the end of each line the backslash character `\` is needed. By using the backslash character before the newline, the newline is skipped, allowing the macro to continue consuming the next line. This is required due to how macros are parsed, it seems to follow the following syntax: `<#define> <*> <newline>`. While it might not seem like a big deal, this is actually a very big flaw. If there is any other character after the newline, perhaps a space, your macro would be broken, without you being able to tell why.
+
+## 2.2 Rust
+Now we're going to move onto something more modern. Rust also offers a macro system in the form of `macro_rules!`. Here are the previous examples rewritten in `rust`.
+{{< codeblock name= "C multi-line macro" >}}
+{{< highlight rust >}}
+// Parameterless.
+macro_rules! PI {
+    () => {
+        3.14159
+    }
+}
+
+// With arguments.
+macro_rules! CALCULATE_CIRCLE_AREA_FROM_RADIUS {
+  ($radius: expr) => {
+    ($radius * $radius * PI![])
+  }
+}
+
+// Usage.
+fn main () {
+  // Notice that `println` is also a macro.
+  // We can either use `()`/`[]` for macro args.
+  println!("{}", CALCULATE_CIRCLE_AREA_FROM_RADIUS![5.0]);
+}
+{{< /highlight>}}
+{{< /codeblock>}}
+As you can probably tell it is a little more advanced than the simple `#define`. Notice that the invocation of a macro is clearly distinct from an invocation of a function thanks to the postfix `!`. It mgiht be a small detail but it is important nonetheless.
+
+One additional thing you might notice is the `expr` annotation after the argument. In `Rust`, this is called a `designator`. You can think of them as type annotation for the argument. I won't discuss them here for the sake of brevity, but you can check them out [here](https://doc.rust-lang.org/rust-by-example/macros/designators.html#:~:text=expr%20is%20used%20for%20expressions,is%20used%20for%20literal%20constants).
+
+
+
+
+
 
