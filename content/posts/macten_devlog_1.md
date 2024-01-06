@@ -84,12 +84,14 @@ In C, you might have seen something like this:
 {{< /codeblock>}}
 The `do {...} while (0)` is a well known trick used for bundling statements together. By using the do-while trick, we can invoke the multi-line macro and terminate it with a `;` as we would with any other function. 
 
-While it's true that we could also just not include a `;` at the end of the last statement, the problem with this is that it introduces another point of maintenance, if another statement were to be added you would have to be mindful of it. Additionally, when you expand the macro, you can also clearly see the statements which belongs in the macro block.
+> Why not just exclude `;` from the last statement?
 
-Notice that at the end of each line the backslash character `\` is needed. By using the backslash character before the newline, the newline is skipped, allowing the macro to continue consuming the next line. This is required due to how macros are parsed, it seems to follow the following syntax: `<#define> <*> <newline>`. While it might not seem like a big deal, this is actually a very big flaw. If there is any other character after the newline, perhaps a space, your macro would be broken, without you being able to tell why.
+Though omitting `;` at the end of the last statement is an option, it poses maintenance challenges. Adding another statement later would require careful consideration, adding to potential points of maintenance. Furthermore, this approach introduces the problem of `macro hygiene` which will be covered shortly. Also, by encapsulating the macro body within a `do-while` block, when expanding the macro, the statements belonging to the macro block can be cleary seen. However the same can not be said with just omitting `;`.
+
+Notice that at the end of each line the backslash character `\` is needed. By using the backslash character before the newline, the newline is skipped, allowing the macro to continue consuming the next line. This is required due to how macros are parsed, it seems to obey the following syntax: `<#define> <*> <newline>`. While it might not seem like a big deal, this is actually a very big flaw. If there is any other character after the newline, perhaps a space, your macro would be broken, without you being able to tell why.
 
 ## 2.2 Rust
-Now we're going to move onto something more modern. Rust also offers a macro system in the form of `macro_rules!`. Here are the previous examples rewritten in `rust`.
+Moving onto something more modern. `Rust` offers a macro system in the form of `macro_rules!`. Here are the previous examples rewritten in `rust`.
 {{< codeblock name= "C multi-line macro" >}}
 {{< highlight rust >}}
 // Parameterless.
@@ -114,12 +116,24 @@ fn main () {
 }
 {{< /highlight>}}
 {{< /codeblock>}}
-As you can probably tell it is a little more advanced than the simple `#define`. Notice that the invocation of a macro is clearly distinct from an invocation of a function thanks to the postfix `!`. It mgiht be a small detail but it is important nonetheless.
+As you can probably tell it is a little more advanced than the simple `#define`. Notice that the invocation of a macro is clearly distinct from an invocation of a function thanks to the postfix `!`. It might be a small detail but it is important nonetheless.
 
-One additional thing you might notice is the `expr` annotation after the argument. In `Rust`, this is called a `designator`. You can think of them as type annotation for the argument. I won't discuss them here for the sake of brevity, but you can check them out [here](https://doc.rust-lang.org/rust-by-example/macros/designators.html#:~:text=expr%20is%20used%20for%20expressions,is%20used%20for%20literal%20constants).
+One additional thing you might notice is the `expr` annotation after the argument. In `Rust`, this is called a `designator`. You can think of them as type annotation. I won't discuss them here for the sake of brevity, but you can check them out [here](https://doc.rust-lang.org/rust-by-example/macros/designators.html#:~:text=expr%20is%20used%20for%20expressions,is%20used%20for%20literal%20constants).
 
+## 2.2.1 Multi-line revision
 
+As you can see `Rust` provides a much nicer interface for creating macros. The macro body can be scoped within a block without the pesky newline problem. This makes defining a multi-line macro much more friendly compared to `C`.
 
-
-
-
+Here's a revision of the `do-while` trick.
+{{< codeblock name= "C multi-line macro" >}}
+{{< highlight rust >}}
+macro_rules! foo {
+    () => {
+        {
+          // statement 1...
+          // statement 2...
+        }
+    }
+}
+{{< /highlight>}}
+{{< /codeblock>}}
